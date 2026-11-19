@@ -1,0 +1,51 @@
+/* Additions for the React app (screens that the prototype rendered as modals or did not have). */
+.spin{width:22px;height:22px;border-radius:50%;border:3px solid var(--line);border-top-color:var(--mgt-blue);animation:rot .8s linear infinite;flex:none}
+@keyframes rot{to{transform:rotate(360deg)}}
+.loading{display:flex;align-items:center;justify-content:center;gap:12px;padding:48px 16px;color:var(--ink-dim);font-size:13px;font-weight:600}
+.err{display:flex;gap:8px;align-items:flex-start;background:var(--danger-soft);color:var(--danger);border-radius:var(--mgt-radius-sm);padding:10px 14px;font-size:13px;margin-bottom:14px;line-height:1.6}
+.btn-row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.muted{color:var(--ink-dim)}
+.linkish{background:none;border:0;padding:0;color:var(--teal-strong);font-weight:600;text-decoration:underline;cursor:pointer}
+
+/* login */
+.login{min-height:100vh;display:grid;place-items:center;padding:16px;background:radial-gradient(ellipse at 0 0,var(--glow-a),transparent 50%),radial-gradient(ellipse at 100% 100%,var(--glow-b),transparent 45%),var(--paper)}
+.login .card{width:min(420px,100%);padding:32px}
+.login .brand-head{margin:0 0 20px;padding:0 0 20px;cursor:default}
+.login h1{margin:0 0 6px;font-size:22px;font-weight:800;letter-spacing:-.02em}
+
+/* public pages (signing link, approval link) */
+.pubbar{height:60px;background:var(--surface);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:14px;padding:0 16px;flex:none}
+.pubbar .brand-logo{width:72px}
+.pubbar .ttl{font-weight:800;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;padding-left:14px;border-left:1px solid var(--line)}
+.pubbar .ttl small{display:block;font-weight:500;color:var(--ink-dim);font-size:12px}
+.pubbar .acts{margin-left:auto;display:flex;gap:8px;align-items:center;flex:none}
+.pubpage{min-height:100vh;background:var(--paper);display:flex;flex-direction:column}
+.pubbody{width:min(1040px,100%);margin:0 auto;padding:24px 16px 64px}
+.result{max-width:560px;margin:48px auto;text-align:center}
+.result .eic{width:58px;height:58px;border-radius:16px;display:grid;place-items:center;margin:0 auto 16px}
+.result h1{margin:0 0 8px;font-size:24px;font-weight:800;letter-spacing:-.02em}
+.result p{color:var(--ink-dim);line-height:1.7;margin:0 0 18px}
+
+/* PDF viewer inside a modal */
+.pdfview{background:var(--desk);border-radius:var(--mgt-radius-md);max-height:70vh;overflow:auto;padding:20px 52px 20px 20px;display:flex;flex-direction:column;gap:20px}
+.ed .pdfwait,.pdfview .pdfwait{margin:auto}
+
+/* send page thumbnails */
+.fcard .th canvas{width:82%;height:auto;box-shadow:0 2px 8px rgb(0 0 0 / .18);margin-top:22px;background:#fff}
+
+/* outbox */
+.outbox{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.3fr);gap:16px;align-items:start}
+.outbox .list{display:flex;flex-direction:column;gap:6px;max-height:70vh;overflow:auto}
+.obi{display:block;width:100%;text-align:left;border:1px solid var(--line);border-radius:var(--mgt-radius-sm);background:var(--surface);padding:10px 12px}
+.obi:hover{border-color:var(--line-strong)}
+.obi.on{border-color:var(--mgt-blue);background:var(--teal-soft)}
+.obi b{display:block;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.obi small{color:var(--ink-dim);font-size:11.5px}
+.outbox iframe{width:100%;height:70vh;border:1px solid var(--line);border-radius:var(--mgt-radius-md);background:#fff}
+.sigrow{display:grid;grid-template-columns:2fr 1fr;gap:10px}
+
+@media (max-width:900px){
+  .outbox{grid-template-columns:1fr}
+  .pubbar .ttl small{display:none}
+  .pdfview{padding:12px}
+}

@@ -1,0 +1,33 @@
+# .NET
+bin/
+obj/
+*.user
+*.suo
+.vs/
+TestResults/
+# never commit local secrets or overrides (use dotnet user-secrets / environment variables)
+appsettings.*.local.json
+appsettings.Production.json
+*.pfx
+
+# Node / Vite
+node_modules/
+dist/
+*.local
+.vite/
+
+# Published frontend copied into the API
+backend/src/MgtSign.Api/wwwroot/
+
+# Editors / OS
+.idea/
+.vscode/*
+!.vscode/extensions.json
+Thumbs.db
+.DS_Store
+
+# Claude Code local files
+.claude/settings.local.json
+
+# Generated test output
+docs/sample-signed.pdf

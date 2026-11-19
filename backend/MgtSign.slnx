@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/MgtSign.Api/MgtSign.Api.csproj" />
+    <Project Path="src/MgtSign.Domain/MgtSign.Domain.csproj" />
+    <Project Path="src/MgtSign.Infrastructure/MgtSign.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/MgtSign.Tests/MgtSign.Tests.csproj" />
+  </Folder>
+</Solution>
