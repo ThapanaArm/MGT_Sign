@@ -49,20 +49,27 @@ public record AttachmentDto(Guid Id, string FileName, string ContentType, long S
     string? Context, DateTime CreatedAt);
 public record DocumentDto(Guid Id, DocumentKind Kind, string FileName, long Size, int PageCount, string Sha256);
 public record AuditDto(long Id, DateTime At, string Action, string Actor, string? Detail, string? IpAddress);
+/// <summary>LiveSignRecipientIds: signers the host (sender) may sign with face to face on this device right now.</summary>
 public record EnvelopeActions(bool CanEditFields, bool CanSend, bool CanVoid, bool CanDelete, bool CanAddAttachments, bool CanRemind,
-    bool CanSaveTemplate, string? SignToken, string? ApproveToken);
+    bool CanSaveTemplate, string? SignToken, string? ApproveToken, List<Guid> LiveSignRecipientIds);
 public record EnvelopeDetail(Guid Id, string Code, EnvelopeType Type, EnvelopeStatus Status, string StatusLabel, string Subject, string? Message,
     string SenderName, string SenderEmail, DateTime CreatedAt, DateTime? SentAt, DateTime? CompletedAt, DateTime ExpiresAt, int ReminderDays,
     bool SigningOrder, string? VoidReason, bool IsDeleted, List<DocumentDto> Documents, List<RecipientDto> Recipients, List<FieldDto> Fields,
     WorkflowDto? Workflow, List<AttachmentDto> Attachments, EnvelopeActions Actions);
 
 // ---------- signing via link token (also used by signed-in users through actions.signToken) ----------
-/// <summary>State: ready | accessCode | done | declined | closed | waiting | expired</summary>
+/// <summary>State: ready | accessCode | done | declined | closed | waiting | expired.
+/// LiveHost is set during a face-to-face session: signatures must then be drawn by hand on this device.</summary>
 public record SignSession(string Token, Guid EnvelopeId, string Code, string Subject, string? Message, string SenderName, string SenderEmail,
     RecipientDto Recipient, string State, int PageCount, List<FieldDto> Fields, List<AttachmentDto> Attachments, SignatureDto? SavedSignature,
-    bool CanAddAttachments);
+    bool CanAddAttachments, string? LiveHost);
 public record FieldValueInput(Guid Id, string? Value, string? RenderedImage);
-public record CompleteSigningRequest(List<FieldValueInput> Fields, SignatureDto? AdoptedSignature);
+/// <summary>Summary of the handwriting captured on the drawing pad (required for live signing).</summary>
+public record LiveSignatureEvidence(int Strokes, int Points, int DurationMs, string PointerType);
+public record CompleteSigningRequest(List<FieldValueInput> Fields, SignatureDto? AdoptedSignature, LiveSignatureEvidence? Live = null);
+/// <summary>The host confirms how they checked the signer's identity (e.g. "Thai ID card ending 1234").</summary>
+public record StartLiveRequest(string IdentityCheck);
+public record LiveSessionResponse(string Token, Guid RecipientId, string RecipientName, DateTime ExpiresAt);
 public record DeclineRequest(string Reason);
 
 // ---------- approval via link token ----------

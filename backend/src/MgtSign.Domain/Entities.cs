@@ -104,7 +104,17 @@ public class Recipient
     public DateTime? CompletedAt { get; set; }
     public string? DeclineReason { get; set; }
 
+    // Live (face-to-face) signing on the host's device
+    public string? LiveHostName { get; set; }
+    public string? LiveHostEmail { get; set; }
+    public string? LiveIdentityCheck { get; set; }
+    public DateTime? LiveStartedAt { get; set; }
+    /// <summary>Handwriting evidence summary recorded when a live signer finishes (pointer type, strokes, points, duration).</summary>
+    public string? LiveEvidence { get; set; }
+
     public bool IsSigner => Role is RecipientRole.Signer or RecipientRole.InPersonSigner;
+    public const int LiveSessionHours = 2;
+    public bool IsLive(DateTime now) => LiveStartedAt is { } t && now - t < TimeSpan.FromHours(LiveSessionHours) && Status == RecipientStatus.Pending;
     public bool Acts => Role != RecipientRole.CarbonCopy;
 }
 

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api } from '../api/client';
+import type { RecipientDto } from '../api/types';
 import { AttachmentTable } from '../components/Attachments';
 import { useCounts } from '../components/AppShell';
 import { StatusPill } from '../components/common';
@@ -26,6 +27,7 @@ export function DetailsPage() {
   const { refresh } = useCounts();
   const [tab, setTab] = useState<Tab>('sum');
   const [viewDoc, setViewDoc] = useState(false);
+  const [liveFor, setLiveFor] = useState<RecipientDto | null>(null);
   const { data: e, setData, error, loading, reload } = useLoad(() => api.envelope(id), [id]);
   const audit = useLoad(() => api.audit(id), [id]);
   const acts = useEnvelopeActions(() => { reload(); audit.reload(); refresh(); });
@@ -104,7 +106,9 @@ export function DetailsPage() {
           <LiveFlow w={e.workflow} />
         </>}
         <div className="sec">Recipients</div>
-        {e.recipients.length ? <div className="tbl-wrap"><table className="t"><thead><tr><th>#</th><th>Recipient</th><th>Role</th><th>Status</th><th>Completed</th></tr></thead><tbody>
+        {A.liveSignRecipientIds.length > 0 && <div className="note" style={{ background: 'var(--green-soft)', color: 'var(--green-strong)' }}><Icon name="sign" size={16} />
+          <span>Is the signer with you? Use <b>Sign live now</b> to let them sign by hand on this device straight away, without waiting for the email.</span></div>}
+        {e.recipients.length ? <div className="tbl-wrap"><table className="t"><thead><tr><th>#</th><th>Recipient</th><th>Role</th><th>Status</th><th>Completed</th><th></th></tr></thead><tbody>
           {[...e.recipients].sort((a, b) => a.routingOrder - b.routingOrder).map(r => (
             <tr key={r.id}>
               <td><span className="dot" style={{ display: 'inline-block', background: r.color }} /> {r.routingOrder}</td>
@@ -112,6 +116,8 @@ export function DetailsPage() {
               <td>{ROLE_LABEL[r.role]}</td>
               <td><span className={'pill ' + (RECIPIENT_STATUS_CLASS[r.status] || '')}>{r.role === 'carbonCopy' ? (e.status === 'completed' ? 'Copy sent' : 'Waiting') : r.status[0].toUpperCase() + r.status.slice(1)}</span></td>
               <td>{r.completedAt ? fmt(r.completedAt) : '—'}</td>
+              <td style={{ textAlign: 'right' }}>{A.liveSignRecipientIds.includes(r.id) &&
+                <button className="btn sm ok" onClick={() => setLiveFor(r)}><Icon name="sign" size={14} /> Sign live now</button>}</td>
             </tr>
           ))}
         </tbody></table></div> : <p className="hint">No recipients.</p>}
@@ -128,8 +134,35 @@ export function DetailsPage() {
         ))}</div> : <p className="hint">No events yet.</p>)}
     </div>
 
+    {liveFor && <LiveStartModal envelopeId={id} r={liveFor} onClose={() => setLiveFor(null)} onStarted={token => nav('/sign/' + token)} />}
     {viewDoc && <Modal onClose={() => setViewDoc(false)} size="wide" title={<><Icon name="pages" size={22} /> {signed ? signed.fileName : original?.fileName || 'Document'}</>}>
       <PdfViewer load={() => api.document(id, 'current')} deps={[id]} />
     </Modal>}
   </>;
+}
+
+/** Host confirms the signer is present and how their identity was checked, then the signer signs by hand on this device. */
+function LiveStartModal({ envelopeId, r, onClose, onStarted }: { envelopeId: string; r: RecipientDto; onClose: () => void; onStarted: (token: string) => void }) {
+  const ui = useUi();
+  const [idCheck, setIdCheck] = useState('');
+  const [present, setPresent] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const start = async () => {
+    if (idCheck.trim().length < 3) { ui.toast('Describe how you checked the identity, e.g. Thai ID card ending 1234.'); return; }
+    if (!present) { ui.toast(`Confirm that ${r.name} is with you.`); return; }
+    setBusy(true);
+    try { const s = await api.startLive(envelopeId, r.id, { identityCheck: idCheck.trim() }); onStarted(s.token); }
+    catch (x) { ui.toast(errMsg(x)); setBusy(false); }
+  };
+  return (
+    <Modal onClose={onClose} size="sm" title={<><Icon name="sign" size={22} /> Live signing with {r.name}</>}>
+      <p className="hint" style={{ marginTop: -8 }}>{r.name} signs by hand on this device now — with a finger, stylus or mouse. No email is sent. You are recorded as the host, together with your identity check.</p>
+      <label className="l">How did you check the signer's identity? <span className="req">*</span></label>
+      <input className="inp" value={idCheck} onChange={e => setIdCheck(e.target.value)} placeholder="e.g. Thai ID card ending 1234 / employee badge MGT000123" autoFocus />
+      <label className="chk" style={{ marginTop: 14 }}><input type="checkbox" checked={present} onChange={e => setPresent(e.target.checked)} /> {r.name} is here with me and I checked their identity</label>
+      {r.hasAccessCode && <p className="hint">This recipient has an access code. They will be asked to enter it before signing.</p>}
+      <div className="mfoot"><button className="btn ghost" onClick={onClose}>Cancel</button>
+        <button className="btn primary" disabled={busy} onClick={start}>{busy ? 'Starting…' : 'Hand over the device and start'}</button></div>
+    </Modal>
+  );
 }

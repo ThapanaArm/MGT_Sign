@@ -101,7 +101,9 @@ public static class Mapping
             CanAddAttachments: isSender && CanAddAttachments(e),
             CanRemind: isSender && active && !e.IsDeleted,
             CanSaveTemplate: isSender && e.Type == EnvelopeType.Request,
-            SignToken: r?.AccessToken, ApproveToken: a?.AccessToken);
+            SignToken: r?.AccessToken, ApproveToken: a?.AccessToken,
+            LiveSignRecipientIds: isSender && !e.IsDeleted && e.Status == EnvelopeStatus.Sent && e.ExpiresAt > DateTime.UtcNow
+                ? Routing.CurrentGroup(e).Where(x => x.IsSigner).Select(x => x.Id).ToList() : []);
         return new EnvelopeDetail(e.Id, e.Code, e.Type, e.Status, StatusLabel(e, action), e.Subject, e.Message, e.SenderName, e.SenderEmail,
             e.CreatedAt, e.SentAt, e.CompletedAt, e.ExpiresAt, e.ReminderDays, e.SigningOrderEnabled, e.VoidReason, e.IsDeleted,
             e.Documents.OrderBy(d => d.Kind).Select(ToDto).ToList(), e.Recipients.OrderBy(x => x.RoutingOrder).ThenBy(x => x.Name).Select(ToDto).ToList(),

@@ -49,3 +49,9 @@
   .pubbar .ttl small{display:none}
   .pdfview{padding:12px}
 }
+
+/* live (face-to-face) signing */
+.padwrap.live canvas { height: 260px; touch-action: none; }
+.livebar { display: flex; align-items: center; gap: 10px; padding: 10px 20px; font-size: 13px; font-weight: 700; flex: none;
+  background: var(--green-soft); color: var(--green-strong); border-bottom: 1px solid var(--line); }
+.livebar .dotlive { width: 9px; height: 9px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 4px color-mix(in srgb, var(--green) 25%, transparent); }

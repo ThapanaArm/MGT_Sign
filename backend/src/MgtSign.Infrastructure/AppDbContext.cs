@@ -88,6 +88,10 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.Property(x => x.PrivateMessage).HasMaxLength(1000);
             e.Property(x => x.AccessToken).HasMaxLength(64);
             e.Property(x => x.DeclineReason).HasMaxLength(1000);
+            e.Property(x => x.LiveHostName).HasMaxLength(200);
+            e.Property(x => x.LiveHostEmail).HasMaxLength(256);
+            e.Property(x => x.LiveIdentityCheck).HasMaxLength(300);
+            e.Property(x => x.LiveEvidence).HasMaxLength(500);
             e.Ignore(x => x.IsSigner); e.Ignore(x => x.Acts);
         });
         m.Entity<Field>(e =>

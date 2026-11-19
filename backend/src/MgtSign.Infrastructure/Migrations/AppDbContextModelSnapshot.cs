@@ -491,6 +491,26 @@ namespace MgtSign.Infrastructure.Migrations
                     b.Property<Guid>("EnvelopeId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<string>("LiveEvidence")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("LiveHostEmail")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("LiveHostName")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("LiveIdentityCheck")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<DateTime?>("LiveStartedAt")
+                        .HasPrecision(3)
+                        .HasColumnType("datetime2(3)");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)

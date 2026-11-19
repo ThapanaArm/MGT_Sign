@@ -65,6 +65,9 @@ public class EnvelopesController(EnvelopeService svc, AppDbContext db, CurrentUs
     [HttpPut("{id:guid}/fields")] public Task<EnvelopeDetail> Fields(Guid id, FieldsUpdate req) => svc.SaveFields(id, req);
     [HttpPost("{id:guid}/send")] public Task<EnvelopeDetail> Send(Guid id) => svc.Send(id);
     [HttpPost("{id:guid}/void")] public Task<EnvelopeDetail> Void(Guid id, VoidRequest req) => svc.Void(id, req.Reason);
+    /// <summary>Host face-to-face signing on this device. Returns the signer's link token for the live session.</summary>
+    [HttpPost("{id:guid}/live/{recipientId:guid}")]
+    public Task<LiveSessionResponse> StartLive(Guid id, Guid recipientId, StartLiveRequest req) => svc.StartLive(id, recipientId, req.IdentityCheck);
     [HttpPost("{id:guid}/remind")] public async Task<IActionResult> Remind(Guid id) { await svc.Remind(id); return NoContent(); }
     [HttpDelete("{id:guid}")] public async Task<IActionResult> Delete(Guid id) { await svc.SetDeleted(id, true); return NoContent(); }
     [HttpPost("{id:guid}/restore")] public async Task<IActionResult> Restore(Guid id) { await svc.SetDeleted(id, false); return NoContent(); }

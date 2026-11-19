@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api, auth, saveBlob, setAccessCode, ApiError } from '../api/client';
-import type { AttachmentDto, FieldDto, FieldValueInput, SignatureDto, SignSession } from '../api/types';
+import type { AttachmentDto, FieldDto, FieldValueInput, LiveSignatureEvidence, SignatureDto, SignSession } from '../api/types';
 import { AdoptSignature } from '../components/AdoptSignature';
 import { AttachmentsModal } from '../components/Attachments';
 import { Brand } from '../components/common';
@@ -19,10 +19,13 @@ export function SignPage() {
   const [session, setSession] = useState<SignSession | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
+  // remembered so the finish screen can ask the signer to hand the device back to the host
+  const [liveHost, setLiveHost] = useState<string | null>(null);
+  const take = (s: SignSession) => { if (s.liveHost) setLiveHost(s.liveHost); setSession(s); };
 
   const load = useCallback(async () => {
     setLoading(true); setError('');
-    try { setSession(await api.signSession(token)); }
+    try { const s = await api.signSession(token); if (s.liveHost) setLiveHost(s.liveHost); setSession(s); }
     catch (e) { setError(errMsg(e)); }
     finally { setLoading(false); }
   }, [token]);
@@ -31,9 +34,9 @@ export function SignPage() {
 
   if (loading && !session) return <PubFrame><Loading /></PubFrame>;
   if (!session) return <PubFrame><div className="pubbody"><ErrorNote error={error || 'This signing link is not valid.'} onRetry={load} /></div></PubFrame>;
-  if (session.state === 'accessCode') return <PubFrame><AccessCodeForm session={session} onDone={setSession} /></PubFrame>;
-  if (session.state !== 'ready') return <PubFrame title={session.subject}><SignResult s={session} /></PubFrame>;
-  return <Signer key={session.token + session.state} session={session} token={token} onDone={setSession} />;
+  if (session.state === 'accessCode') return <PubFrame><AccessCodeForm session={session} onDone={take} /></PubFrame>;
+  if (session.state !== 'ready') return <PubFrame title={session.subject}><SignResult s={session} liveHost={liveHost} /></PubFrame>;
+  return <Signer key={session.token + session.state} session={session} token={token} onDone={take} />;
 }
 
 function PubFrame({ title, children }: { title?: string; children: ReactNode }) {
@@ -76,8 +79,19 @@ function AccessCodeForm({ session, onDone }: { session: SignSession; onDone: (s:
   );
 }
 
-function SignResult({ s }: { s: SignSession }) {
+function SignResult({ s, liveHost }: { s: SignSession; liveHost?: string | null }) {
+  const nav = useNavigate();
   const viewer = s.recipient.role === 'viewer';
+  if (liveHost && s.state === 'done') return (
+    <div className="pubbody"><div className="result">
+      <div className="eic tone-green"><Icon name="check" size={28} /></div>
+      <h1>Thank you, {s.recipient.name} — signed</h1>
+      <p>Your handwritten signature was applied and recorded in the audit trail. Please hand the device back to <b>{liveHost}</b>.</p>
+      {auth.token && <div className="acts" style={{ justifyContent: 'center', display: 'flex', gap: 10 }}>
+        <button className="btn primary" onClick={() => nav('/envelopes/' + s.envelopeId)}><Icon name="pages" size={16} /> Back to the envelope</button></div>}
+      <p className="hint">{s.subject} · {s.code}</p>
+    </div></div>
+  );
   const R: Record<string, [IconName, string, string, string]> = {
     done: ['check', 'tone-green', viewer ? 'Thanks for reviewing' : "You're done signing", viewer ? 'Your acknowledgement was recorded in the audit trail.' : 'Your signature was applied and recorded in the audit trail. You will receive the completed document by email once every party has finished.'],
     declined: ['ban', 'tone-red', 'You declined to sign', 'The sender has been notified. No further action is needed.'],
@@ -103,6 +117,10 @@ function Signer({ session, token, onDone }: { session: SignSession; token: strin
   const nav = useNavigate();
   const me = session.recipient;
   const viewer = me.role === 'viewer';
+  const live = !!session.liveHost;
+  // live: signature and initials are drawn separately on this device; evidence is summed over all drawings
+  const [liveImg, setLiveImg] = useState<{ signature?: string; initial?: string }>({});
+  const [liveEv, setLiveEv] = useState<LiveSignatureEvidence | null>(null);
   const { pdf, error: pdfErr } = usePdf(() => api.signDocument(token), [token]);
   const mine = session.fields.filter(f => f.recipientId === me.id);
   const others = session.fields.filter(f => f.recipientId !== me.id && hasValue(f.value));
@@ -130,7 +148,7 @@ function Signer({ session, token, onDone }: { session: SignSession; token: strin
 
   const fill = (f: FieldDto) => {
     if (f.type === 'signature' || f.type === 'initial') {
-      const img = f.type === 'signature' ? current?.signatureImage : current?.initialImage;
+      const img = live ? liveImg[f.type] : f.type === 'signature' ? current?.signatureImage : current?.initialImage;
       if (img && !hasValue(values[f.id])) setV(f.id, img);
       else setAdoptFor(f);
     } else if (f.type === 'stamp') {
@@ -159,7 +177,8 @@ function Signer({ session, token, onDone }: { session: SignSession; token: strin
         if (f.type === 'checkbox') return { id: f.id, value: v === 'true' ? 'true' : 'false', renderedImage: renderValuePng('checkbox', v, wPt, hPt) };
         return { id: f.id, value: v.trim() ? v : null, renderedImage: v.trim() ? renderValuePng('text', v, wPt, hPt) : null };
       });
-      const r = await api.completeSigning(token, { fields: out, adoptedSignature: sig });
+      // In live signing nothing is saved to anyone's profile; the handwriting evidence goes with the signature.
+      const r = await api.completeSigning(token, live ? { fields: out, adoptedSignature: null, live: liveEv } : { fields: out, adoptedSignature: sig });
       onDone(r);
     } catch (e) { ui.toast(errMsg(e)); } finally { setBusy(false); }
   };
@@ -223,6 +242,7 @@ function Signer({ session, token, onDone }: { session: SignSession; token: strin
           </div>
         </div>
       </div>
+      {live && <div className="livebar"><span className="dotlive" /> Live signing · hosted by {session.liveHost} · {me.name}, please review and sign by hand on this device</div>}
       {viewer
         ? <div className="signbanner"><Icon name="eye" /> <span>You were asked to view this document. Review it, then click <b>Finish</b> to confirm you have viewed it.</span>
           <button className="btn sm" style={{ marginLeft: 'auto' }} onClick={() => setShowAtt(true)}><Icon name="clip" size={14} /> Attachments ({atts.length})</button></div>
@@ -246,7 +266,16 @@ function Signer({ session, token, onDone }: { session: SignSession; token: strin
         </aside>
       </div>
 
-      {adoptFor && <AdoptSignature name={me.name} email={me.email} saved={session.savedSignature} onClose={() => setAdoptFor(null)}
+      {adoptFor && live && <AdoptSignature live purpose={adoptFor.type === 'initial' ? 'initial' : 'signature'} adoptLabel="Sign" name={me.name} email={me.email} onClose={() => setAdoptFor(null)}
+        onAdopt={s => {
+          const kind = adoptFor.type === 'initial' ? 'initial' : 'signature';
+          setLiveImg(m => ({ ...m, [kind]: s.signatureImage }));
+          const e = s.evidence;
+          if (e) setLiveEv(p => p ? { strokes: p.strokes + e.strokes, points: p.points + e.points, durationMs: p.durationMs + e.durationMs, pointerType: p.pointerType === 'pen' || e.pointerType === 'pen' ? 'pen' : e.pointerType } : e);
+          setV(adoptFor.id, s.signatureImage);
+          setAdoptFor(null);
+        }} />}
+      {adoptFor && !live && <AdoptSignature name={me.name} email={me.email} saved={session.savedSignature} onClose={() => setAdoptFor(null)}
         onAdopt={s => {
           const dto = { signatureImage: s.signatureImage, initialImage: s.initialImage };
           if (s.method !== 'saved') setSig(dto);

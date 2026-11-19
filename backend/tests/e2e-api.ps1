@@ -125,5 +125,39 @@ $list = Invoke-RestMethod "$Base/api/envelopes?folder=completed" -Headers $H
 Check 'list completed folder' ($list.items.id -contains $env.id -and $list.folderCounts.completed -ge 1)
 $dash = Invoke-RestMethod "$Base/api/dashboard" -Headers $H
 Check 'dashboard' ($dash.completed -ge 1)
+# ---------- live (face-to-face) signing ----------
+$lp = @{ type = 'request'; subject = 'Live signing test'; signingOrder = $false; expiryDays = 7; reminderDays = 0
+  recipients = @(@{ name = 'Live Signer'; email = 'live1@example.com'; role = 'signer'; routingOrder = 1 }, @{ name = 'Remote Signer'; email = 'remote1@example.com'; role = 'signer'; routingOrder = 1 }) } | ConvertTo-Json -Depth 5
+$form2 = New-Object System.Net.Http.MultipartFormDataContent
+$form2.Add((New-Object System.Net.Http.StringContent($lp, [Text.Encoding]::UTF8)), 'payload')
+$pdf2 = New-Object System.Net.Http.ByteArrayContent(, (New-Pdf)); $pdf2.Headers.ContentType = 'application/pdf'; $form2.Add($pdf2, 'documents', 'live.pdf')
+$le = $client.PostAsync("$Base/api/envelopes", $form2).Result.Content.ReadAsStringAsync().Result | ConvertFrom-Json
+$ls = $le.recipients | Where-Object { $_.email -eq 'live1@example.com' }; $rs = $le.recipients | Where-Object { $_.email -eq 'remote1@example.com' }
+$lf = @{ fields = @(@{ recipientId = $ls.id; type = 'signature'; page = 0; x = 0.1; y = 0.6; width = 0.3; height = 0.06; required = $true },
+                    @{ recipientId = $rs.id; type = 'signature'; page = 0; x = 0.5; y = 0.6; width = 0.3; height = 0.06; required = $true }) } | ConvertTo-Json -Depth 5
+Invoke-RestMethod "$Base/api/envelopes/$($le.id)/fields" -Method Put -Headers $H -ContentType 'application/json' -Body $lf | Out-Null
+$le = Invoke-RestMethod "$Base/api/envelopes/$($le.id)/send" -Method Post -Headers $H -ContentType 'application/json' -Body '{}'
+Check 'live: both signers offered for live signing' ($le.actions.liveSignRecipientIds.Count -eq 2)
+function PostAuth($url, $obj) { $c = New-Object System.Net.Http.HttpClient; $c.DefaultRequestHeaders.Authorization = New-Object System.Net.Http.Headers.AuthenticationHeaderValue('Bearer', $login.token)
+  $r = $c.PostAsync($url, (New-Object System.Net.Http.StringContent(($obj | ConvertTo-Json -Depth 6), [Text.Encoding]::UTF8, 'application/json'))).Result
+  [pscustomobject]@{ Ok = $r.IsSuccessStatusCode; Body = ($r.Content.ReadAsStringAsync().Result | ConvertFrom-Json) } }
+$r = PostAuth "$Base/api/envelopes/$($le.id)/live/$($ls.id)" @{ identityCheck = '' }
+Check 'live: identity check required' (-not $r.Ok -and $r.Body.message -like '*identity*')
+$r = PostAuth "$Base/api/envelopes/$($le.id)/live/$($ls.id)" @{ identityCheck = 'Thai ID card ending 1234' }
+Check 'live: session started' ($r.Ok -and $r.Body.token.Length -ge 32)
+$lt = $r.Body.token
+$sess = Invoke-RestMethod "$Base/api/sign/$lt"
+Check 'live: session shows host, no saved signature' ($sess.liveHost -eq $login.user.name -and $null -eq $sess.savedSignature)
+$sigField = $sess.fields | Where-Object { $_.recipientId -eq $ls.id }
+$r = PostJson "$Base/api/sign/$lt/complete" @{ fields = @(@{ id = $sigField.id; value = $png }) } $null
+Check 'live: typed/uploaded signature refused' (-not $r.Ok -and $r.Body.message -like '*drawn by hand*')
+$r = PostJson "$Base/api/sign/$lt/complete" @{ fields = @(@{ id = $sigField.id; value = $png }); live = @{ strokes = 3; points = 140; durationMs = 2400; pointerType = 'touch' } } $null
+Check 'live: handwritten signature accepted' ($r.Ok -and $r.Body.state -eq 'done')
+$la = Invoke-RestMethod "$Base/api/envelopes/$($le.id)/audit" -Headers $H
+$ev = $la | Where-Object { $_.action -eq 'Signed live in person' }
+Check 'live: audit records host, identity and handwriting' ($ev -and $ev.detail -like '*Thai ID card ending 1234*' -and $ev.detail -like '*touch*3 stroke*')
+$le = Invoke-RestMethod "$Base/api/envelopes/$($le.id)" -Headers $H
+Check 'live: other signer still pending, live list updated' ($le.status -eq 'sent' -and $le.actions.liveSignRecipientIds.Count -eq 1 -and $le.actions.liveSignRecipientIds[0] -eq $rs.id)
+
 Write-Host "Signed PDF: $env:TEMP\mgt-e2e-signed.pdf"
 if ($fails) { Write-Host "$fails check(s) failed" -ForegroundColor Red; exit 1 } else { Write-Host 'All checks passed' -ForegroundColor Green }

@@ -84,6 +84,8 @@ export interface AuditDto { id: number; at: string; action: string; actor: strin
 export interface EnvelopeActions {
   canEditFields: boolean; canSend: boolean; canVoid: boolean; canDelete: boolean; canAddAttachments: boolean; canRemind: boolean;
   canSaveTemplate: boolean; signToken?: string | null; approveToken?: string | null;
+  /** Signers the sender can host face to face on this device right now. */
+  liveSignRecipientIds: Guid[];
 }
 export interface EnvelopeDetail {
   id: Guid; code: string; type: EnvelopeType; status: EnvelopeStatus; statusLabel: string; subject: string; message?: string | null;
@@ -98,9 +100,15 @@ export interface SignSession {
   token: string; envelopeId: Guid; code: string; subject: string; message?: string | null; senderName: string; senderEmail: string;
   recipient: RecipientDto; state: SignState; pageCount: number; fields: FieldDto[]; attachments: AttachmentDto[];
   savedSignature?: SignatureDto | null; canAddAttachments: boolean;
+  /** Set during a live (face-to-face) session: signatures must be drawn by hand on this device. */
+  liveHost?: string | null;
 }
 export interface FieldValueInput { id: Guid; value?: string | null; renderedImage?: string | null }
-export interface CompleteSigningRequest { fields: FieldValueInput[]; adoptedSignature?: SignatureDto | null }
+/** Summary of handwriting captured on the drawing pad (required in live signing). */
+export interface LiveSignatureEvidence { strokes: number; points: number; durationMs: number; pointerType: string }
+export interface CompleteSigningRequest { fields: FieldValueInput[]; adoptedSignature?: SignatureDto | null; live?: LiveSignatureEvidence | null }
+export interface StartLiveRequest { identityCheck: string }
+export interface LiveSessionResponse { token: string; recipientId: Guid; recipientName: string; expiresAt: string }
 export interface DeclineRequest { reason: string }
 
 // approval (link token)

@@ -284,15 +284,36 @@ public sealed class EnvelopeService(AppDbContext db, CurrentUser me, Auditor aud
             await db.SaveChangesAsync();
         }
         var hidden = state is "accessCode" or "expired" or "closed" && r.Status == RecipientStatus.Pending;
+        var live = r.IsLive(Now);
         SignatureDto? saved = null;
-        if (state == "ready")
+        if (state == "ready" && !live) // live signers must draw on the spot, so no saved signature is offered
         {
             var u = await db.Users.AsNoTracking().FirstOrDefaultAsync(x => x.Email == r.Email);
             if (u?.SignatureImage is not null) saved = new SignatureDto(u.SignatureImage, u.InitialImage);
         }
         return new SignSession(token, e.Id, e.Code, e.Subject, hidden ? null : e.Message, e.SenderName, e.SenderEmail, Mapping.ToDto(r), state,
             e.Original!.PageCount, hidden ? [] : e.Fields.Select(Mapping.ToDto).ToList(), hidden ? [] : e.Attachments.Select(Mapping.ToDto).ToList(),
-            saved, state == "ready" && Mapping.CanAddAttachments(e));
+            saved, state == "ready" && Mapping.CanAddAttachments(e), live ? r.LiveHostName : null);
+    }
+
+    /// <summary>
+    /// Starts face-to-face signing: the sender hosts the signer on their own device. No email is sent;
+    /// the signer must draw the signature by hand, and the host's identity check is recorded.
+    /// </summary>
+    public async Task<LiveSessionResponse> StartLive(Guid id, Guid recipientId, string identityCheck)
+    {
+        var e = await LoadOwned(id);
+        if (e.SenderId != me.Id) throw ApiException.Forbidden("Only the sender can host live signing.");
+        if (e.IsDeleted || e.Status != EnvelopeStatus.Sent) throw ApiException.Bad("Live signing is only possible while the envelope is out for signature.");
+        if (e.ExpiresAt < Now) throw ApiException.Bad("This envelope has expired.");
+        var r = e.Recipients.FirstOrDefault(x => x.Id == recipientId) ?? throw ApiException.NotFound("Recipient not found.");
+        if (!r.IsSigner) throw ApiException.Bad("Only signers can sign live.");
+        if (!Routing.CurrentGroup(e).Contains(r)) throw ApiException.Bad($"It is not {r.Name}'s turn to sign yet.");
+        if (string.IsNullOrWhiteSpace(identityCheck) || identityCheck.Trim().Length < 3) throw ApiException.Bad("Describe how you checked the signer's identity (e.g. Thai ID card ending 1234).");
+        r.LiveHostName = me.Name; r.LiveHostEmail = me.Email; r.LiveIdentityCheck = identityCheck.Trim(); r.LiveStartedAt = Now;
+        auditor.For(e)("Live signing session started", $"{r.Name} <{r.Email}> signs face to face on {me.Name}'s device · identity check: {r.LiveIdentityCheck}", me.Name);
+        await db.SaveChangesAsync();
+        return new LiveSessionResponse(r.AccessToken, r.Id, r.Name, r.LiveStartedAt.Value.AddHours(Recipient.LiveSessionHours));
     }
 
     public async Task<SignSession> CompleteSigning(string token, string? accessCode, CompleteSigningRequest req)
@@ -321,10 +342,27 @@ public sealed class EnvelopeService(AppDbContext db, CurrentUser me, Auditor aud
             var filled = f.Type == FieldType.Checkbox ? f.Value == "true" : !string.IsNullOrEmpty(f.Value);
             if (f.Required && !filled) throw ApiException.Bad($"Complete the required field: {f.Label ?? f.Type.ToString()}.");
         }
+        var live = r.IsLive(Now);
+        if (live)
+        {
+            // Face-to-face: every signature/initial must be drawn by hand on the pad, not typed or uploaded.
+            var ev = req.Live;
+            var hasMarks = e.Fields.Any(f => f.RecipientId == r.Id && f.Type is FieldType.Signature or FieldType.Initial && !string.IsNullOrEmpty(f.Value));
+            if (hasMarks && (ev is null || ev.Strokes < 1 || ev.Points < 15 || ev.DurationMs < 300))
+                throw ApiException.Bad("In live signing the signature must be drawn by hand on the signing pad.");
+            if (ev is not null)
+            {
+                var pointer = ev.PointerType is "pen" or "touch" or "mouse" ? ev.PointerType : "unknown";
+                r.LiveEvidence = $"drawn with {pointer} · {ev.Strokes} stroke(s) · {ev.Points} points · {ev.DurationMs / 1000.0:0.0}s";
+            }
+        }
         r.Status = r.Role == RecipientRole.Viewer ? RecipientStatus.Viewed : RecipientStatus.Signed;
         r.CompletedAt = Now;
-        audit(r.Role switch { RecipientRole.Viewer => "Document viewed & acknowledged", RecipientRole.InPersonSigner => "Signed in person", _ => "Document signed" },
-            $"{r.Name} <{r.Email}>{(r.Role == RecipientRole.InPersonSigner ? " · hosted by " + e.SenderName : "")}", r.Name);
+        if (live)
+            audit("Signed live in person", $"{r.Name} <{r.Email}> · hosted by {r.LiveHostName} <{r.LiveHostEmail}> · identity check: {r.LiveIdentityCheck}{(r.LiveEvidence is null ? "" : " · " + r.LiveEvidence)}", r.Name);
+        else
+            audit(r.Role switch { RecipientRole.Viewer => "Document viewed & acknowledged", RecipientRole.InPersonSigner => "Signed in person", _ => "Document signed" },
+                $"{r.Name} <{r.Email}>{(r.Role == RecipientRole.InPersonSigner ? " · hosted by " + e.SenderName : "")}", r.Name);
 
         if (req.AdoptedSignature?.SignatureImage is { } sig)
         {

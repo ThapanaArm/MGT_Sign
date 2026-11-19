@@ -85,6 +85,14 @@ Without SMTP settings every email is kept in the `OutboxEmails` table. Admins ca
 4. **Approve / sign by personal link** — every recipient and approver gets a link with an unguessable token (`/sign/{token}`, `/approve/{token}`). Recipients can be protected with an access code. Signed-in users reach the same pages from their task list.
 5. **Complete** — the server stamps all values into the PDF and appends a **Certificate of Completion** (envelope summary, workflow decisions, recipients, attachments, audit trail with IP addresses).
 
+### Live signing (เซ็นสด, face to face)
+
+When a signer is in the same room, the sender opens the envelope and clicks **Sign live now** next to that signer (shown for signers whose turn it is). The sender records how they checked the signer's identity (for example "Thai ID card ending 1234") and hands the device over. No email is needed.
+
+- The signer must **draw** the signature and initials by hand (finger, stylus or mouse). Typed, uploaded and saved signatures are switched off, and the server refuses a live signature without handwriting evidence.
+- The audit trail and the Certificate of Completion record the host, the identity check, and how the signature was drawn (input type, strokes, points, time).
+- A live session is valid for 2 hours. Access codes still apply.
+
 ### Approval workflow types
 
 All 10 types are presets of one engine (`backend/src/MgtSign.Domain/WorkflowEngine.cs`): ordered steps, each with a rule (*all / any one / quorum by count or %*), an optional document-value condition (THB), optional escalation and approvers with optional veto.

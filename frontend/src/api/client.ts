@@ -68,6 +68,8 @@ export const api = {
   saveFields: (id: string, b: T.FieldsUpdate) => put<T.EnvelopeDetail>(`/api/envelopes/${id}/fields`, b),
   send: (id: string) => post<T.EnvelopeDetail>(`/api/envelopes/${id}/send`),
   voidEnvelope: (id: string, b: T.VoidRequest) => post<T.EnvelopeDetail>(`/api/envelopes/${id}/void`, b),
+  /** Host face-to-face (live) signing for a signer on this device. */
+  startLive: (id: string, recipientId: string, b: T.StartLiveRequest) => post<T.LiveSessionResponse>(`/api/envelopes/${id}/live/${recipientId}`, b),
   remind: (id: string) => post<void>(`/api/envelopes/${id}/remind`),
   deleteEnvelope: (id: string) => del(`/api/envelopes/${id}`),
   restoreEnvelope: (id: string) => post<void>(`/api/envelopes/${id}/restore`),
