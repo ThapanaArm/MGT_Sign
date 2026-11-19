@@ -37,8 +37,8 @@ export function LoginPage() {
         <h1>Sign in</h1>
         <p className="hint" style={{ marginTop: 0 }}>MGT Electronic Signature Management System</p>
         {error && <ErrorNote error={error} />}
-        <label className="l" htmlFor="em">Email</label>
-        <input id="em" className="inp" type="email" autoComplete="username" value={email} onChange={e => setEmail(e.target.value)} autoFocus />
+        <label className="l" htmlFor="em">Username or email</label>
+        <input id="em" className="inp" type="text" autoComplete="username" placeholder="Company username (e.g. MGT000123) or email" value={email} onChange={e => setEmail(e.target.value)} autoFocus />
         <label className="l" htmlFor="pw">Password</label>
         <input id="pw" className="inp" type="password" autoComplete="current-password" value={password} onChange={e => setPassword(e.target.value)} />
         <button className="btn primary" type="submit" disabled={busy} style={{ width: '100%', marginTop: 22 }}>{busy ? 'Signing in…' : 'Sign in'}</button>

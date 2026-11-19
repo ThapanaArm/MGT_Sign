@@ -40,6 +40,10 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.Property(x => x.Title).HasMaxLength(200);
             e.Property(x => x.Company).HasMaxLength(200);
             e.Property(x => x.PasswordHash).HasMaxLength(256);
+            e.Property(x => x.Username).HasMaxLength(100);
+            e.Property(x => x.Department).HasMaxLength(200);
+            e.Property(x => x.ExternalId).HasMaxLength(64);
+            e.HasIndex(x => x.Username);
         });
         m.Entity<Contact>(e =>
         {

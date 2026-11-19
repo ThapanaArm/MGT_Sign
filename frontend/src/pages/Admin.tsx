@@ -56,7 +56,7 @@ function ProfileTab() {
   };
   const changePw = async () => {
     if (!pw.cur || !pw.next) { ui.toast('Enter your current and new password.'); return; }
-    if (pw.next.length < 8) { ui.toast('Use at least 8 characters for the new password.'); return; }
+    if (pw.next.length < 10) { ui.toast('Use at least 10 characters for the new password.'); return; }
     if (pw.next !== pw.again) { ui.toast('The new passwords do not match.'); return; }
     try { await api.changePassword({ currentPassword: pw.cur, newPassword: pw.next }); setPw({ cur: '', next: '', again: '' }); ui.toast('Password changed.'); }
     catch (e) { ui.toast(errMsg(e)); }
@@ -86,12 +86,18 @@ function ProfileTab() {
           <button className="btn primary" disabled={busy} onClick={save}>Save profile</button>
         </div>
       </div>
+      {user?.source === 'datawarehouse' ? (
+        <div className="card"><h3>Password</h3>
+          <p className="hint" style={{ marginTop: 0 }}>You sign in with your company account{user.username ? ` (${user.username})` : ''} from MGT_Datawarehouse. Change your password in the company system; MGT Sign does not store it.</p>
+        </div>
+      ) : (
       <div className="card"><h3>Change password</h3>
         <label className="l">Current password</label><input className="inp" type="password" autoComplete="current-password" value={pw.cur} onChange={e => setPw({ ...pw, cur: e.target.value })} />
         <label className="l">New password</label><input className="inp" type="password" autoComplete="new-password" value={pw.next} onChange={e => setPw({ ...pw, next: e.target.value })} />
         <label className="l">Confirm new password</label><input className="inp" type="password" autoComplete="new-password" value={pw.again} onChange={e => setPw({ ...pw, again: e.target.value })} />
         <div className="mfoot"><button className="btn primary" onClick={changePw}>Change password</button></div>
       </div>
+      )}
       {adopt && user && <AdoptSignature name={user.name} email={user.email} adoptLabel="Adopt" onClose={() => setAdopt(false)}
         onAdopt={a => void saveSig({ signatureImage: a.signatureImage, initialImage: a.initialImage })} />}
     </div>
@@ -141,13 +147,16 @@ function UsersTab() {
   return <>
     <div className="btn-row" style={{ marginBottom: 14 }}><button className="btn primary" onClick={() => setEdit('new')}><Icon name="plus" size={16} /> Add user</button></div>
     {error && <ErrorNote error={error} onRetry={reload} />}
-    <div className="tbl-wrap"><table className="t"><thead><tr><th>Name</th><th>Role</th><th>Status</th><th>Created</th><th></th></tr></thead><tbody>
-      {!data && loading ? <tr><td colSpan={5}><Loading /></td></tr> : (data || []).map(u => (
+    <div className="tbl-wrap"><table className="t"><thead><tr><th>Name</th><th>Account</th><th>Role</th><th>Status</th><th>Last sign-in</th><th></th></tr></thead><tbody>
+      {!data && loading ? <tr><td colSpan={6}><Loading /></td></tr> : (data || []).map(u => (
         <tr key={u.id}>
-          <td><b>{u.name}</b><div className="to">{u.email}{u.title ? ' · ' + u.title : ''}{u.company ? ' · ' + u.company : ''}</div></td>
+          <td><b>{u.name}</b><div className="to">{u.email}{u.title ? ' · ' + u.title : ''}{u.department ? ' · ' + u.department : ''}</div></td>
+          <td>{u.source === 'datawarehouse'
+            ? <span className="pill sent" title="Signs in with the company account">Company{u.username ? ' · ' + u.username : ''}</span>
+            : <span className="pill">Local</span>}</td>
           <td><span className={'pill ' + (u.role === 'admin' ? 'sent' : '')}>{u.role === 'admin' ? 'Admin' : 'User'}</span></td>
           <td><span className={'pill ' + (u.isActive ? 'completed' : 'voided')}>{u.isActive ? 'Active' : 'Disabled'}</span></td>
-          <td style={{ whiteSpace: 'nowrap' }}>{fmt(u.createdAt)}</td>
+          <td style={{ whiteSpace: 'nowrap' }}>{u.lastLoginAt ? fmt(u.lastLoginAt) : '—'}</td>
           <td style={{ textAlign: 'right' }}><button className="btn sm" onClick={() => setEdit(u)}><Icon name="edit" size={14} /> Edit</button></td>
         </tr>
       ))}
@@ -160,10 +169,11 @@ function UserModal({ u, onClose, onSaved }: { u: AdminUserDto | null; onClose: (
   const ui = useUi();
   const [f, setF] = useState<AdminUserInput>({ email: u?.email || '', name: u?.name || '', title: u?.title || '', company: u?.company || '', role: u?.role || 'user', isActive: u?.isActive ?? true, password: '' });
   const [busy, setBusy] = useState(false);
+  const company = u?.source === 'datawarehouse';
   const save = async () => {
     if (!f.name.trim() || !emailOk(f.email.trim())) { ui.toast('Enter a name and a valid email.'); return; }
     if (!u && !(f.password || '').trim()) { ui.toast('Set an initial password.'); return; }
-    if (f.password && f.password.length < 8) { ui.toast('Use at least 8 characters for the password.'); return; }
+    if (f.password && f.password.length < 10) { ui.toast('Use at least 10 characters for the password.'); return; }
     const body: AdminUserInput = { ...f, email: f.email.trim(), name: f.name.trim(), title: f.title?.trim() || null, company: f.company?.trim() || null, password: f.password || null };
     setBusy(true);
     try { if (u) await api.updateUser(u.id, body); else await api.createUser(body); ui.toast(u ? 'User saved.' : 'User created.'); onSaved(); }
@@ -171,14 +181,15 @@ function UserModal({ u, onClose, onSaved }: { u: AdminUserDto | null; onClose: (
   };
   return (
     <Modal onClose={onClose} size="sm" title={u ? 'Edit user' : 'Add user'}>
-      <div className="form-grid">
+      {company && <div className="note"><Icon name="info" size={16} /> Company account from MGT_Datawarehouse. Name, email, role (IT = Admin) and password come from the company system on every sign-in. Here you can only switch MGT Sign access on or off.</div>}
+      <fieldset disabled={company} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}><div className="form-grid">
         <div><label className="l">Full name <span className="req">*</span></label><input className="inp" value={f.name} onChange={e => setF({ ...f, name: e.target.value })} /></div>
         <div><label className="l">Email <span className="req">*</span></label><input className="inp" type="email" value={f.email} onChange={e => setF({ ...f, email: e.target.value })} /></div>
         <div><label className="l">Title</label><input className="inp" value={f.title || ''} onChange={e => setF({ ...f, title: e.target.value })} /></div>
         <div><label className="l">Company</label><input className="inp" value={f.company || ''} onChange={e => setF({ ...f, company: e.target.value })} /></div>
         <div><label className="l">Role</label><select className="inp" value={f.role} onChange={e => setF({ ...f, role: e.target.value as UserRole })}><option value="user">User</option><option value="admin">Admin</option></select></div>
         <div><label className="l">{u ? 'New password' : 'Password'} {!u && <span className="req">*</span>}</label><input className="inp" type="password" autoComplete="new-password" placeholder={u ? 'Leave blank to keep' : ''} value={f.password || ''} onChange={e => setF({ ...f, password: e.target.value })} /></div>
-      </div>
+      </div></fieldset>
       <label className="chk" style={{ marginTop: 16 }}><input type="checkbox" checked={f.isActive} onChange={e => setF({ ...f, isActive: e.target.checked })} /> Active (can sign in)</label>
       <div className="mfoot"><button className="btn ghost" onClick={onClose}>Cancel</button><button className="btn primary" disabled={busy} onClick={save}>Save</button></div>
     </Modal>

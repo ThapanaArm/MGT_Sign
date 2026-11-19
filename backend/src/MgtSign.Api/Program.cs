@@ -4,6 +4,7 @@ using MgtSign.Api.Services;
 using MgtSign.Api.Support;
 using MgtSign.Api.Workers;
 using MgtSign.Infrastructure;
+using MgtSign.Infrastructure.Directory;
 using MgtSign.Infrastructure.Email;
 using MgtSign.Infrastructure.Pdf;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -70,6 +71,13 @@ builder.Services.AddScoped<EnvelopeService>();
 builder.Services.AddSingleton<JwtIssuer>();
 builder.Services.AddSingleton(cfg.GetSection("Pdf").Get<PdfFontOptions>() ?? new PdfFontOptions());
 builder.Services.AddSingleton<IPdfService, PdfService>();
+// Company sign-in against MGT_Datawarehouse.dbo.Ms_User (connection string from secrets: ConnectionStrings:Datawarehouse).
+builder.Services.Configure<DatawarehouseOptions>(o =>
+{
+    cfg.GetSection("Datawarehouse").Bind(o);
+    o.ConnectionString ??= cfg.GetConnectionString("Datawarehouse");
+});
+builder.Services.AddSingleton<IUserDirectory, DatawarehouseDirectory>();
 builder.Services.AddHostedService<OutboxSender>();
 builder.Services.AddHostedService<EscalationWorker>();
 

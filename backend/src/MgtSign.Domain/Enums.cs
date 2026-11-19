@@ -1,6 +1,7 @@
 namespace MgtSign.Domain;
 
 public enum UserRole { User, Admin }
+public enum UserSource { Local, Datawarehouse }
 
 public enum EnvelopeType { Self, Request }
 public enum EnvelopeStatus { Draft, PendingApproval, Sent, Completed, Declined, Voided }

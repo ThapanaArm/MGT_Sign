@@ -7,7 +7,9 @@ namespace MgtSign.Api.Contracts;
 
 // ---------- auth & profile ----------
 public record LoginRequest(string Email, string Password);
-public record UserDto(Guid Id, string Email, string Name, string? Title, string? Company, UserRole Role, bool HasSignature);
+/// <summary>Source "datawarehouse" = company account from MGT_Datawarehouse (password managed there).</summary>
+public record UserDto(Guid Id, string Email, string Name, string? Title, string? Company, UserRole Role, bool HasSignature,
+    UserSource Source, string? Username, string? Department);
 public record LoginResponse(string Token, DateTime ExpiresAt, UserDto User);
 public record ProfileUpdate(string Name, string? Title, string? Company);
 public record PasswordChange(string CurrentPassword, string NewPassword);
@@ -87,7 +89,8 @@ public record TemplateDetail(TemplateDto Template, TemplateDefinition Definition
 public record SaveTemplateRequest(Guid EnvelopeId, string Name);
 public record ContactDto(Guid Id, string Name, string Email, string? Department);
 public record ContactInput(string Name, string Email, string? Department);
-public record AdminUserDto(Guid Id, string Email, string Name, string? Title, string? Company, UserRole Role, bool IsActive, DateTime CreatedAt);
+public record AdminUserDto(Guid Id, string Email, string Name, string? Title, string? Company, UserRole Role, bool IsActive, DateTime CreatedAt,
+    UserSource Source, string? Username, string? Department, DateTime? LastLoginAt);
 public record AdminUserInput(string Email, string Name, string? Title, string? Company, UserRole Role, bool IsActive, string? Password);
 public record SettingsDto(int ExpiryDays, int ReminderDays, bool RequireApproval, WorkflowType DefaultWorkflowType, string? DefaultApproverName, string? DefaultApproverEmail);
 public record OutboxDto(long Id, string To, string Subject, string BodyHtml, DateTime CreatedAt, DateTime? SentAt, string? Error, Guid? EnvelopeId);

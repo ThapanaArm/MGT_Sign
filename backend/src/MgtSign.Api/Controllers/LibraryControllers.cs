@@ -119,7 +119,7 @@ public class ContactsController(AppDbContext db) : ControllerBase
 [ApiController, Route("api/admin"), Authorize(Roles = nameof(UserRole.Admin))]
 public class AdminController(AppDbContext db, EnvelopeService svc) : ControllerBase
 {
-    static AdminUserDto ToDto(User u) => new(u.Id, u.Email, u.Name, u.Title, u.Company, u.Role, u.IsActive, u.CreatedAt);
+    static AdminUserDto ToDto(User u) => new(u.Id, u.Email, u.Name, u.Title, u.Company, u.Role, u.IsActive, u.CreatedAt, u.Source, u.Username, u.Department, u.LastLoginAt);
 
     [HttpGet("users")] public async Task<List<AdminUserDto>> Users() => (await db.Users.AsNoTracking().OrderBy(u => u.Name).ToListAsync()).Select(ToDto).ToList();
 
@@ -138,6 +138,14 @@ public class AdminController(AppDbContext db, EnvelopeService svc) : ControllerB
     public async Task<AdminUserDto> UpdateUser(Guid id, AdminUserInput req)
     {
         var u = await db.Users.FindAsync(id) ?? throw ApiException.NotFound("User not found.");
+        if (u.Source == UserSource.Datawarehouse)
+        {
+            // Name, email, role and password come from MGT_Datawarehouse on every sign-in; only access to MGT Sign is switched here.
+            if (!string.IsNullOrEmpty(req.Password)) throw ApiException.Bad("Company accounts use their company password. It cannot be set here.");
+            u.IsActive = req.IsActive;
+            await db.SaveChangesAsync();
+            return ToDto(u);
+        }
         if (string.IsNullOrWhiteSpace(req.Name) || !Emails.IsValid(req.Email)) throw ApiException.Bad("Enter a name and a valid email.");
         if (u.Role == UserRole.Admin && (req.Role != UserRole.Admin || !req.IsActive) && await db.Users.CountAsync(x => x.Role == UserRole.Admin && x.IsActive) == 1)
             throw ApiException.Bad("Keep at least one active administrator.");

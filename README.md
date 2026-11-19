@@ -53,6 +53,26 @@ dotnet user-secrets set "Seed:AdminPassword" "<initial admin password>" --projec
 
 Change that password after the first sign-in (Admin → Profile) and create the other users in Admin → Users.
 
+### Sign-in with company accounts (MGT_Datawarehouse)
+
+Staff sign in with their company **username or email** and password from `MGT_Datawarehouse.dbo.Ms_User`. Who may sign in (configurable under `Datawarehouse` in `appsettings.json`):
+
+```sql
+((Username NOT IN ('Admin','GLC_Admin') AND Department IN ('IT','HR','Finance')) OR Position IN ('CFO','CEO'))
+AND IsActive = 1
+```
+
+- Passwords are checked against `Ms_User.PasswordHash` (ASP.NET Identity `AQAAAA…` and `pbkdf2$…` formats). Plain-text `Password` is never used.
+- On every sign-in the MGT Sign account is created or refreshed from Ms_User (name, email, position, department). **Department IT → Admin**, everyone else → User (`Datawarehouse:AdminDepartments`).
+- Local accounts (e.g. the first admin) keep working as a break-glass login. Admins can switch a company user's MGT Sign access off in Admin → Users.
+- Set the connection string as a secret, never in a file:
+
+```powershell
+dotnet user-secrets set "ConnectionStrings:Datawarehouse" "Server=<dw server>;Database=MGT_Datawarehouse;User Id=<login>;Password=<password>;TrustServerCertificate=True;Encrypt=True" --project src/MgtSign.Api
+```
+
+Use a read-only SQL login that can only `SELECT` from `dbo.Ms_User` rather than `sa`.
+
 ### Emails
 
 Without SMTP settings every email is kept in the `OutboxEmails` table. Admins can open them in **Admin → Outbox** and click the personal signing/approval links. To send real email set `Smtp:Host`, `Smtp:Port`, `Smtp:UserName`, `Smtp:Password`, `Smtp:From` (user-secrets or environment variables) and `App:PublicUrl` to the address users open.

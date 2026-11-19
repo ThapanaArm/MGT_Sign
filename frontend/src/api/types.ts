@@ -3,6 +3,8 @@
 
 export type Guid = string;
 export type UserRole = 'user' | 'admin';
+/** 'datawarehouse' = company account from MGT_Datawarehouse; its password is managed there. */
+export type UserSource = 'local' | 'datawarehouse';
 export type EnvelopeType = 'self' | 'request';
 export type EnvelopeStatus = 'draft' | 'pendingApproval' | 'sent' | 'completed' | 'declined' | 'voided';
 export type RecipientRole = 'signer' | 'inPersonSigner' | 'viewer' | 'carbonCopy';
@@ -23,7 +25,7 @@ export type Folder = 'all' | 'drafts' | 'progress' | 'approval' | 'completed' | 
 
 // auth & profile
 export interface LoginRequest { email: string; password: string }
-export interface UserDto { id: Guid; email: string; name: string; title?: string | null; company?: string | null; role: UserRole; hasSignature: boolean }
+export interface UserDto { id: Guid; email: string; name: string; title?: string | null; company?: string | null; role: UserRole; hasSignature: boolean; source: UserSource; username?: string | null; department?: string | null }
 export interface LoginResponse { token: string; expiresAt: string; user: UserDto }
 export interface ProfileUpdate { name: string; title?: string | null; company?: string | null }
 export interface PasswordChange { currentPassword: string; newPassword: string }
@@ -128,7 +130,7 @@ export interface TemplateDetail { template: TemplateDto; definition: TemplateDef
 export interface SaveTemplateRequest { envelopeId: Guid; name: string }
 export interface ContactDto { id: Guid; name: string; email: string; department?: string | null }
 export interface ContactInput { name: string; email: string; department?: string | null }
-export interface AdminUserDto { id: Guid; email: string; name: string; title?: string | null; company?: string | null; role: UserRole; isActive: boolean; createdAt: string }
+export interface AdminUserDto { id: Guid; email: string; name: string; title?: string | null; company?: string | null; role: UserRole; isActive: boolean; createdAt: string; source: UserSource; username?: string | null; department?: string | null; lastLoginAt?: string | null }
 export interface AdminUserInput { email: string; name: string; title?: string | null; company?: string | null; role: UserRole; isActive: boolean; password?: string | null }
 export interface SettingsDto { expiryDays: number; reminderDays: number; requireApproval: boolean; defaultWorkflowType: WorkflowType; defaultApproverName?: string | null; defaultApproverEmail?: string | null }
 export interface OutboxDto { id: number; to: string; subject: string; bodyHtml: string; createdAt: string; sentAt?: string | null; error?: string | null; envelopeId?: Guid | null }

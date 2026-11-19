@@ -4,9 +4,17 @@ public class User
 {
     public Guid Id { get; set; } = Guid.NewGuid();
     public string Email { get; set; } = "";
+    /// <summary>Company username (Ms_User.Username) for Datawarehouse accounts.</summary>
+    public string? Username { get; set; }
     public string Name { get; set; } = "";
     public string? Title { get; set; }
     public string? Company { get; set; }
+    public string? Department { get; set; }
+    /// <summary>Local accounts sign in with PasswordHash; Datawarehouse accounts are checked against MGT_Datawarehouse.dbo.Ms_User.</summary>
+    public UserSource Source { get; set; } = UserSource.Local;
+    /// <summary>Ms_User.UserID for Datawarehouse accounts.</summary>
+    public string? ExternalId { get; set; }
+    public DateTime? LastLoginAt { get; set; }
     public string PasswordHash { get; set; } = "";
     public UserRole Role { get; set; } = UserRole.User;
     public bool IsActive { get; set; } = true;
