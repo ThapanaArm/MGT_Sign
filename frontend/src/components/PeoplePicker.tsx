@@ -5,9 +5,11 @@ import { Icon } from '../lib/icons';
 import { Modal } from './Modal';
 
 const SOURCE_LABEL: Record<PersonDto['source'], string> = { company: 'Employee', user: 'MGT Sign user', contact: 'Contact' };
+/** Email identifies a person; company records without an email fall back to the employee username. */
+const personKey = (p: PersonDto) => p.email ? p.email.toLowerCase() : 'u:' + (p.username || p.name).toLowerCase();
 
 /** Debounced search against the user list. */
-function usePeople(query: string, enabled: boolean, take = 30) {
+function usePeople(query: string, enabled: boolean, take = 300) {
   const [list, setList] = useState<PersonDto[]>([]);
   const [loading, setLoading] = useState(false);
   useEffect(() => {
@@ -25,7 +27,7 @@ function usePeople(query: string, enabled: boolean, take = 30) {
 function PersonLine({ p }: { p: PersonDto }) {
   return <>
     <span className="pp-name">{p.name}</span>
-    <span className="pp-sub">{p.email}{p.department ? ' · ' + p.department : ''}{p.position ? ' · ' + p.position : ''}</span>
+    <span className="pp-sub">{p.email || <i>No email in the user list — type it after choosing</i>}{p.username ? ' · ' + p.username : ''}{p.department ? ' · ' + p.department : ''}{p.position ? ' · ' + p.position : ''}</span>
   </>;
 }
 
@@ -64,13 +66,16 @@ export function PersonInput({ value, onChange, onPick, placeholder, ariaLabel, s
     <div className="pp-wrap" ref={wrap} style={style}>
       <input className="inp" type={type} value={value} placeholder={placeholder} aria-label={ariaLabel} autoComplete="off"
         role="combobox" aria-expanded={open} aria-autocomplete="list"
-        onFocus={() => setOpen(true)} onKeyDown={onKey}
+        onFocus={() => setOpen(true)} onClick={() => setOpen(true)} onKeyDown={onKey}
+        onBlur={() => setOpen(false)} /* Tab to the next field closes this list; clicks inside the list keep focus (mousedown is prevented) */
         onChange={e => { onChange(e.target.value); setTyped(true); setOpen(true); setActive(0); }} />
-      {open && (list.length > 0 || loading) && (
-        <div className="pp-list" role="listbox">
-          {loading && !list.length && <div className="pp-empty">Searching…</div>}
+      {open && (
+        <div className="pp-list" role="listbox" onMouseDown={e => e.preventDefault()}>
+          <div className="pp-head">{typed && value.trim() ? `Matching “${value.trim()}”` : 'User list'}{!loading || list.length ? ` · ${list.length} ${list.length === 1 ? 'person' : 'people'}` : ''}</div>
+          {loading && !list.length && <div className="pp-empty">Loading the user list…</div>}
+          {!loading && !list.length && <div className="pp-empty">No one in the user list matches. Keep typing to add someone who is not in the list.</div>}
           {list.map((p, i) => (
-            <button key={p.email} type="button" role="option" aria-selected={i === active} className={'pp-item' + (i === active ? ' on' : '')}
+            <button key={personKey(p)} type="button" role="option" aria-selected={i === active} className={'pp-item' + (i === active ? ' on' : '')}
               onMouseEnter={() => setActive(i)} onMouseDown={e => e.preventDefault()} onClick={() => pick(p)}>
               <PersonLine p={p} /><span className={'pp-src ' + p.source}>{SOURCE_LABEL[p.source]}</span>
             </button>
@@ -86,11 +91,11 @@ export function UserListModal({ multi, exclude = [], onPick, onClose, title }: {
   multi?: boolean; exclude?: string[]; title?: string; onPick: (people: PersonDto[]) => void; onClose: () => void;
 }) {
   const [q, setQ] = useState('');
-  const { list, loading } = usePeople(q, true, 100);
+  const { list, loading } = usePeople(q, true, 300);
   const [sel, setSel] = useState<Record<string, PersonDto>>({});
   const taken = new Set(exclude.map(e => e.trim().toLowerCase()).filter(Boolean));
   const chosen = Object.values(sel);
-  const toggle = (p: PersonDto) => setSel(s => { const n = { ...s }; if (n[p.email]) delete n[p.email]; else n[p.email] = p; return n; });
+  const toggle = (p: PersonDto) => setSel(s => { const n = { ...s }, k = personKey(p); if (n[k]) delete n[k]; else n[k] = p; return n; });
 
   return (
     <Modal onClose={onClose} title={<><Icon name="user" size={22} /> {title || 'Choose from the user list'}</>}>
@@ -102,11 +107,11 @@ export function UserListModal({ multi, exclude = [], onPick, onClose, title }: {
         {loading && !list.length ? <div className="pp-empty">Searching…</div>
           : !list.length ? <div className="pp-empty">No one matches “{q}”. You can still type a name and email on the form.</div>
             : list.map(p => {
-              const already = taken.has(p.email.toLowerCase());
+              const already = !!p.email && taken.has(p.email.toLowerCase()), k = personKey(p);
               return (
-                <button key={p.email} type="button" className={'pp-row' + (sel[p.email] ? ' on' : '')} disabled={already}
+                <button key={k} type="button" className={'pp-row' + (sel[k] ? ' on' : '')} disabled={already}
                   onClick={() => multi ? toggle(p) : onPick([p])}>
-                  {multi && <input type="checkbox" readOnly checked={!!sel[p.email] || already} tabIndex={-1} />}
+                  {multi && <input type="checkbox" readOnly checked={!!sel[k] || already} tabIndex={-1} />}
                   <span className="pp-av">{p.name.split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase()}</span>
                   <span className="pp-txt"><PersonLine p={p} /></span>
                   <span className={'pp-src ' + p.source}>{already ? 'Added' : SOURCE_LABEL[p.source]}</span>
@@ -114,7 +119,7 @@ export function UserListModal({ multi, exclude = [], onPick, onClose, title }: {
               );
             })}
       </div>
-      <p className="hint">Employees come from the company user list (MGT_Datawarehouse). Showing up to 100 matches — refine the search to find more.</p>
+      <p className="hint">{list.length} {list.length === 1 ? 'person' : 'people'} · employees come from the company user list (MGT_Datawarehouse). People without an email can be chosen — type their email on the form.</p>
       {multi && <div className="mfoot"><span className="hint left">{chosen.length} selected</span><button className="btn ghost" onClick={onClose}>Cancel</button>
         <button className="btn primary" disabled={!chosen.length} onClick={() => onPick(chosen)}><Icon name="plus" size={16} /> Add {chosen.length || ''} recipient{chosen.length === 1 ? '' : 's'}</button></div>}
     </Modal>

@@ -101,7 +101,7 @@ public sealed class DatawarehouseDirectory(IOptions<DatawarehouseOptions> option
     public async Task<IReadOnlyList<DirectoryPerson>> Search(string? query, int take, CancellationToken ct = default)
     {
         if (!Enabled) return [];
-        take = Math.Clamp(take, 1, 200);
+        take = Math.Clamp(take, 1, 500);
         try
         {
             await using var conn = new SqlConnection(_o.ConnectionString);
@@ -123,16 +123,18 @@ public sealed class DatawarehouseDirectory(IOptions<DatawarehouseOptions> option
             cmd.CommandText = $"""
                 SELECT TOP ({take}) FullName, Email, Username, Department, Position
                 FROM dbo.Ms_User
-                WHERE IsActive = 1 AND Email IS NOT NULL AND LTRIM(RTRIM(Email)) <> '' {notSystem} {filter}
+                WHERE IsActive = 1 {notSystem} {filter}
                 ORDER BY FullName
                 """;
+            // People without an email are listed too; the sender types the email after picking them.
             var list = new List<DirectoryPerson>();
             await using var r = await cmd.ExecuteReaderAsync(ct);
             while (await r.ReadAsync(ct))
             {
                 var email = (r["Email"] as string ?? "").Trim();
                 var name = (r["FullName"] as string ?? "").Trim();
-                list.Add(new DirectoryPerson(name.Length > 0 ? name : email, email, (r["Username"] as string)?.Trim(), (r["Department"] as string)?.Trim(), (r["Position"] as string)?.Trim()));
+                var username = (r["Username"] as string)?.Trim();
+                list.Add(new DirectoryPerson(name.Length > 0 ? name : email.Length > 0 ? email : username ?? "", email, username, (r["Department"] as string)?.Trim(), (r["Position"] as string)?.Trim()));
             }
             return list;
         }

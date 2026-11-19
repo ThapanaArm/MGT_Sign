@@ -86,3 +86,7 @@
 .nwrap .nbtn { z-index: 2; }
 .pp-item .pp-src { order: 1; }
 .pp-item .pp-sub { order: 2; }
+.pp-head { position: sticky; top: -6px; z-index: 1; margin: -6px -6px 4px; padding: 8px 14px; font-size: 11px; font-weight: 800; letter-spacing: .03em;
+  color: var(--ink-faint); background: var(--surface); border-bottom: 1px solid var(--line); text-transform: uppercase; }
+.pp-list { max-height: 340px; }
+.pp-sub i { color: var(--amber); font-style: normal; }

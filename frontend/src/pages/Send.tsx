@@ -99,9 +99,10 @@ export function SendPage() {
   // user list: which row the single picker fills, or 'multi' to append several recipients
   const [pickFor, setPickFor] = useState<number | 'multi' | null>(null);
   const addPeople = (people: Pick<PersonDto, 'name' | 'email' | 'source'>[]) => setRecips(rs => {
-    const have = new Set(rs.map(r => r.email.trim().toLowerCase()));
+    const have = new Set(rs.map(r => r.email.trim().toLowerCase()).filter(Boolean));
     const keep = rs.filter(r => r.name.trim() || r.email.trim()); // drop the empty starter row
-    const add = people.filter(p => !have.has(p.email.toLowerCase()));
+    // people without an email in the user list are added by name; the sender types their email
+    const add = people.filter(p => !p.email || !have.has(p.email.toLowerCase()));
     return [...keep, ...add.map((p, k) => ({ ...newRecip(keep.length + k + 1), name: p.name, email: p.email }))];
   });
   const onFiles = (f: PdfItem[]) => {

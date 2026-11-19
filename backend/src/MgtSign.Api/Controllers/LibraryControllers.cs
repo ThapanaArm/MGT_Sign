@@ -81,7 +81,7 @@ public class ContactsController(AppDbContext db, IUserDirectory directory) : Con
     [HttpGet("~/api/directory/people")]
     public async Task<List<PersonDto>> People(string? q, int take = 30, CancellationToken ct = default)
     {
-        take = Math.Clamp(take, 1, 200);
+        take = Math.Clamp(take, 1, 500);
         var s = (q ?? "").Trim();
         var users = db.Users.AsNoTracking().Where(u => u.IsActive);
         var contacts = db.Contacts.AsNoTracking();
@@ -94,10 +94,11 @@ public class ContactsController(AppDbContext db, IUserDirectory directory) : Con
             .Select(u => new PersonDto(u.Name, u.Email, u.Username, u.Department, u.Title, "user"))
             .Concat((await contacts.OrderBy(c => c.Name).Take(take).ToListAsync(ct)).Select(c => new PersonDto(c.Name, c.Email, null, c.Department, null, "contact")));
         var company = (await directory.Search(s, take, ct)).Select(p => new PersonDto(p.Name, p.Email, p.Username, p.Department, p.Position, "company"));
-        // One row per email: the company record wins for name/department, local rows fill gaps.
+        // One row per person: by email, or by employee username when the company record has no email.
+        // The company record wins for name/department; local rows fill gaps.
         return company.Concat(local)
-            .Where(p => Emails.IsValid(p.Email))
-            .GroupBy(p => p.Email.Trim().ToLowerInvariant())
+            .Where(p => p.Name.Length > 0 && (p.Email.Length == 0 || Emails.IsValid(p.Email)))
+            .GroupBy(p => p.Email.Length > 0 ? p.Email.Trim().ToLowerInvariant() : "user:" + (p.Username ?? p.Name).ToLowerInvariant())
             .Select(g => g.First())
             .OrderBy(p => p.Name, StringComparer.CurrentCultureIgnoreCase)
             .Take(take).ToList();
