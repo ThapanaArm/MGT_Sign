@@ -137,6 +137,8 @@ export interface TemplateDefinition { subject?: string | null; message?: string 
 export interface TemplateDetail { template: TemplateDto; definition: TemplateDefinition }
 export interface SaveTemplateRequest { envelopeId: Guid; name: string }
 export interface ContactDto { id: Guid; name: string; email: string; department?: string | null }
+/** A person from the user list. source: user (MGT Sign account) | contact (saved) | company (MGT_Datawarehouse employee). */
+export interface PersonDto { name: string; email: string; username?: string | null; department?: string | null; position?: string | null; source: 'user' | 'contact' | 'company' }
 export interface ContactInput { name: string; email: string; department?: string | null }
 export interface AdminUserDto { id: Guid; email: string; name: string; title?: string | null; company?: string | null; role: UserRole; isActive: boolean; createdAt: string; source: UserSource; username?: string | null; department?: string | null; lastLoginAt?: string | null }
 export interface AdminUserInput { email: string; name: string; title?: string | null; company?: string | null; role: UserRole; isActive: boolean; password?: string | null }

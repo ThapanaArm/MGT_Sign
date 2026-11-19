@@ -105,6 +105,8 @@ export const api = {
   saveTemplate: (b: T.SaveTemplateRequest) => post<T.TemplateDto>('/api/templates', b),
   deleteTemplate: (id: string) => del(`/api/templates/${id}`),
   contacts: () => get<T.ContactDto[]>('/api/contacts'),
+  /** User list: MGT Sign users, saved contacts and active company employees, searched by name/email/username/department. */
+  people: (q: string, take = 30) => get<T.PersonDto[]>('/api/directory/people' + qs({ q, take })),
   addContact: (b: T.ContactInput) => post<T.ContactDto>('/api/contacts', b),
   updateContact: (id: string, b: T.ContactInput) => put<T.ContactDto>(`/api/contacts/${id}`, b),
   deleteContact: (id: string) => del(`/api/contacts/${id}`),

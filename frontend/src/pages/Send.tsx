@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../api/client';
-import type { ContactDto, CreateEnvelopeRequest, RecipientRole, TemplateDetail, WorkflowTypeDto } from '../api/types';
+import type { ContactDto, CreateEnvelopeRequest, PersonDto, RecipientRole, TemplateDetail, WorkflowTypeDto } from '../api/types';
+import { PersonInput, UserListModal } from '../components/PeoplePicker';
 import { StagedFiles } from '../components/Attachments';
 import { useAuth } from '../components/auth';
 import { Modal } from '../components/Modal';
@@ -95,6 +96,14 @@ export function SendPage() {
 
   const setR = (i: number, patch: Partial<Recip>) => setRecips(rs => rs.map((r, k) => k === i ? { ...r, ...patch } : r));
   const removeR = (i: number) => setRecips(rs => rs.filter((_, k) => k !== i));
+  // user list: which row the single picker fills, or 'multi' to append several recipients
+  const [pickFor, setPickFor] = useState<number | 'multi' | null>(null);
+  const addPeople = (people: Pick<PersonDto, 'name' | 'email' | 'source'>[]) => setRecips(rs => {
+    const have = new Set(rs.map(r => r.email.trim().toLowerCase()));
+    const keep = rs.filter(r => r.name.trim() || r.email.trim()); // drop the empty starter row
+    const add = people.filter(p => !have.has(p.email.toLowerCase()));
+    return [...keep, ...add.map((p, k) => ({ ...newRecip(keep.length + k + 1), name: p.name, email: p.email }))];
+  });
   const onFiles = (f: PdfItem[]) => {
     setFiles(f);
     if (f.length && !subject) setSubject(('Please sign: ' + f[0].file.name).slice(0, 100));
@@ -207,17 +216,13 @@ export function SendPage() {
                 <div className="rf">
                   <label className="l">Name <span className="req">*</span></label>
                   <div className="nwrap">
-                    <button className="nbtn" title="Choose from contacts" onClick={e => ui.menu(e.currentTarget, [
-                      ...(user ? [{ label: `${user.name} — ${user.email} (me)`, icon: 'user' as const, run: () => setR(i, { name: user.name, email: user.email }) }] : []),
-                      ...contacts.map(p => ({ label: `${p.name} — ${p.email}`, icon: 'user' as const, run: () => setR(i, { name: p.name, email: p.email }) })),
-                    ], 'Contacts')}><Icon name="copy" size={18} /></button>
-                    <input className="inp" value={r.name} onChange={e => setR(i, { name: e.target.value })} aria-label="Recipient name" />
+                    <button className="nbtn" title="Choose from the user list" aria-label="Choose from the user list" onClick={() => setPickFor(i)}><Icon name="user" size={18} /></button>
+                    <PersonInput value={r.name} ariaLabel="Recipient name" placeholder="Type a name, employee ID or department"
+                      onChange={v => setR(i, { name: v })} onPick={p => setR(i, { name: p.name, email: p.email })} />
                   </div>
                   <label className="l">Email <span className="req">*</span></label>
-                  <input className="inp" list="dir" value={r.email} aria-label="Recipient email" onChange={e => {
-                    const email = e.target.value; const p = contacts.find(d => d.email === email);
-                    setR(i, p && !r.name ? { email, name: p.name } : { email });
-                  }} />
+                  <PersonInput type="email" value={r.email} ariaLabel="Recipient email" placeholder="name@company.com"
+                    onChange={v => setR(i, { email: v })} onPick={p => setR(i, { name: p.name, email: p.email })} />
                   {r.accessCode && <div className="rtag"><Icon name="key" size={14} /> Access code required <a href="#rm" onClick={e => { e.preventDefault(); setR(i, { accessCode: undefined }); }}>Remove</a></div>}
                   {r.privateMessage && <div className="rtag"><Icon name="msg" size={14} /> Private message: “{r.privateMessage.slice(0, 60)}{r.privateMessage.length > 60 ? '…' : ''}” <a href="#rm" onClick={e => { e.preventDefault(); setR(i, { privateMessage: undefined }); }}>Remove</a></div>}
                 </div>
@@ -235,7 +240,20 @@ export function SendPage() {
               </div>
             ))}
           </div>
-          <button className="btn" onClick={() => setRecips(rs => [...rs, newRecip(rs.length + 1)])}><Icon name="plus" size={16} /> Add Recipient</button>
+          <div className="rc-adds">
+            <button className="btn" onClick={() => setRecips(rs => [...rs, newRecip(rs.length + 1)])}><Icon name="plus" size={16} /> Add Recipient</button>
+            <button className="btn" onClick={() => setPickFor('multi')}><Icon name="user" size={16} /> Add from user list</button>
+            {user && !recips.some(r => r.email.trim().toLowerCase() === user.email.toLowerCase()) &&
+              <button className="btn ghost" onClick={() => addPeople([{ name: user.name, email: user.email, source: 'user' }])}><Icon name="user" size={16} /> Add me</button>}
+          </div>
+          {pickFor !== null && <UserListModal multi={pickFor === 'multi'}
+            title={pickFor === 'multi' ? 'Add recipients from the user list' : 'Choose a recipient'}
+            exclude={recips.map(r => r.email)} onClose={() => setPickFor(null)}
+            onPick={people => {
+              if (pickFor === 'multi') addPeople(people);
+              else setR(pickFor, { name: people[0].name, email: people[0].email });
+              setPickFor(null);
+            }} />}
         </>}
       </>)}
 

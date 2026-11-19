@@ -55,3 +55,34 @@
 .livebar { display: flex; align-items: center; gap: 10px; padding: 10px 20px; font-size: 13px; font-weight: 700; flex: none;
   background: var(--green-soft); color: var(--green-strong); border-bottom: 1px solid var(--line); }
 .livebar .dotlive { width: 9px; height: 9px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 4px color-mix(in srgb, var(--green) 25%, transparent); }
+
+/* user list picker */
+.pp-wrap { position: relative; min-width: 0; }
+.pp-list { position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 60; max-height: 300px; overflow: auto; padding: 6px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--mgt-radius-md); box-shadow: var(--pop-shadow); }
+.pp-item, .pp-row { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 10px; border: 0; border-radius: var(--mgt-radius-sm);
+  background: none; text-align: left; color: var(--ink); flex-wrap: wrap; }
+.pp-item.on, .pp-item:hover, .pp-row:hover:not(:disabled) { background: var(--surface-2); }
+.pp-item .pp-name { flex: 1 1 auto; }
+.pp-name { font-weight: 700; font-size: 13px; }
+.pp-sub { flex-basis: 100%; font-size: 12px; color: var(--ink-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pp-src { margin-left: auto; font-size: 10px; font-weight: 800; padding: 2px 7px; border-radius: 5px; background: var(--surface-2); color: var(--ink-dim); white-space: nowrap; }
+.pp-src.company { background: var(--teal-soft); color: var(--teal-strong); }
+.pp-src.user { background: var(--green-soft); color: var(--green-strong); }
+.pp-empty { padding: 14px; text-align: center; color: var(--ink-dim); font-size: 13px; }
+.pp-table { max-height: min(55vh, 460px); overflow: auto; border: 1px solid var(--line); border-radius: var(--mgt-radius-md); padding: 4px; }
+.pp-row { flex-wrap: nowrap; border-bottom: 1px solid var(--line); border-radius: 0; }
+.pp-row:last-child { border-bottom: 0; }
+.pp-row.on { background: var(--teal-soft); }
+.pp-row:disabled { opacity: .55; cursor: default; }
+.pp-row input[type=checkbox] { width: 17px; height: 17px; accent-color: var(--mgt-blue); flex: none; }
+.pp-av { display: grid; place-items: center; width: 34px; height: 34px; flex: none; border-radius: 9px; background: var(--teal-soft); color: var(--teal-strong); font-size: 12px; font-weight: 800; }
+.pp-txt { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.pp-txt .pp-sub { flex-basis: auto; }
+.rc-adds { display: flex; gap: 10px; flex-wrap: wrap; }
+/* let the people suggestions overflow the recipient card */
+.rc { overflow: visible; }
+.rc .rbar { border-radius: var(--mgt-radius-md) 0 0 var(--mgt-radius-md); }
+.nwrap .nbtn { z-index: 2; }
+.pp-item .pp-src { order: 1; }
+.pp-item .pp-sub { order: 2; }

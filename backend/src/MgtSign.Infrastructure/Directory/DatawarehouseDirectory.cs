@@ -32,10 +32,14 @@ public enum DirectoryLoginStatus { Success, NotFound, WrongPassword, NoPasswordS
 public sealed record DirectoryUser(string UserId, string Username, string Email, string FullName, string? Department, string? Position, bool IsAdmin);
 public sealed record DirectoryLoginResult(DirectoryLoginStatus Status, DirectoryUser? User = null);
 
+public sealed record DirectoryPerson(string Name, string Email, string? Username, string? Department, string? Position);
+
 public interface IUserDirectory
 {
     bool Enabled { get; }
     Task<DirectoryLoginResult> Authenticate(string usernameOrEmail, string password, CancellationToken ct = default);
+    /// <summary>Active employees with an email, matching name / email / username / department. Empty query lists people alphabetically.</summary>
+    Task<IReadOnlyList<DirectoryPerson>> Search(string? query, int take, CancellationToken ct = default);
 }
 
 public sealed class DatawarehouseDirectory(IOptions<DatawarehouseOptions> options, ILogger<DatawarehouseDirectory> log) : IUserDirectory
@@ -91,6 +95,51 @@ public sealed class DatawarehouseDirectory(IOptions<DatawarehouseOptions> option
             // Never log the connection string or the password.
             log.LogWarning("Company user directory (MGT_Datawarehouse) is unavailable: {Error}", ex.Message);
             return new(DirectoryLoginStatus.Unavailable);
+        }
+    }
+
+    public async Task<IReadOnlyList<DirectoryPerson>> Search(string? query, int take, CancellationToken ct = default)
+    {
+        if (!Enabled) return [];
+        take = Math.Clamp(take, 1, 200);
+        try
+        {
+            await using var conn = new SqlConnection(_o.ConnectionString);
+            await conn.OpenAsync(ct);
+            await using var cmd = conn.CreateCommand();
+            cmd.CommandTimeout = _o.TimeoutSeconds;
+            var q = (query ?? "").Trim();
+            var filter = "";
+            if (q.Length > 0)
+            {
+                // LIKE wildcards in the user's text are escaped; the value itself is a parameter.
+                var like = "%" + q.Replace("[", "[[]").Replace("%", "[%]").Replace("_", "[_]") + "%";
+                cmd.Parameters.Add("@q", SqlDbType.NVarChar, 210).Value = like;
+                filter = "AND (FullName LIKE @q OR Email LIKE @q OR Username LIKE @q OR Department LIKE @q OR Position LIKE @q)";
+            }
+            // System accounts (ExcludedUsernames, e.g. Admin / GLC_Admin) are not people to send documents to.
+            var excluded = _o.ExcludedUsernames.Select((v, i) => { var n = $"@x{i}"; cmd.Parameters.Add(n, SqlDbType.NVarChar, 200).Value = v; return n; }).ToList();
+            var notSystem = excluded.Count == 0 ? "" : $"AND Username NOT IN ({string.Join(",", excluded)})";
+            cmd.CommandText = $"""
+                SELECT TOP ({take}) FullName, Email, Username, Department, Position
+                FROM dbo.Ms_User
+                WHERE IsActive = 1 AND Email IS NOT NULL AND LTRIM(RTRIM(Email)) <> '' {notSystem} {filter}
+                ORDER BY FullName
+                """;
+            var list = new List<DirectoryPerson>();
+            await using var r = await cmd.ExecuteReaderAsync(ct);
+            while (await r.ReadAsync(ct))
+            {
+                var email = (r["Email"] as string ?? "").Trim();
+                var name = (r["FullName"] as string ?? "").Trim();
+                list.Add(new DirectoryPerson(name.Length > 0 ? name : email, email, (r["Username"] as string)?.Trim(), (r["Department"] as string)?.Trim(), (r["Position"] as string)?.Trim()));
+            }
+            return list;
+        }
+        catch (Exception ex) when (ex is SqlException or InvalidOperationException or TimeoutException)
+        {
+            log.LogWarning("Company user directory search failed: {Error}", ex.Message);
+            return [];
         }
     }
 }

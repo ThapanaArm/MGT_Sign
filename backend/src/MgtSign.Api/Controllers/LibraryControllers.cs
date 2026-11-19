@@ -4,6 +4,7 @@ using MgtSign.Api.Services;
 using MgtSign.Api.Support;
 using MgtSign.Domain;
 using MgtSign.Infrastructure;
+using MgtSign.Infrastructure.Directory;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -72,9 +73,35 @@ public class TemplatesController(AppDbContext db, EnvelopeService svc, CurrentUs
 }
 
 [ApiController, Route("api/contacts"), Authorize]
-public class ContactsController(AppDbContext db) : ControllerBase
+public class ContactsController(AppDbContext db, IUserDirectory directory) : ControllerBase
 {
     static ContactDto ToDto(Contact c) => new(c.Id, c.Name, c.Email, c.Department);
+
+    /// <summary>User list for choosing recipients and approvers: MGT Sign users, saved contacts and active company employees.</summary>
+    [HttpGet("~/api/directory/people")]
+    public async Task<List<PersonDto>> People(string? q, int take = 30, CancellationToken ct = default)
+    {
+        take = Math.Clamp(take, 1, 200);
+        var s = (q ?? "").Trim();
+        var users = db.Users.AsNoTracking().Where(u => u.IsActive);
+        var contacts = db.Contacts.AsNoTracking();
+        if (s.Length > 0)
+        {
+            users = users.Where(u => u.Name.Contains(s) || u.Email.Contains(s) || (u.Username != null && u.Username.Contains(s)) || (u.Department != null && u.Department.Contains(s)));
+            contacts = contacts.Where(c => c.Name.Contains(s) || c.Email.Contains(s) || (c.Department != null && c.Department.Contains(s)));
+        }
+        var local = (await users.OrderBy(u => u.Name).Take(take).ToListAsync(ct))
+            .Select(u => new PersonDto(u.Name, u.Email, u.Username, u.Department, u.Title, "user"))
+            .Concat((await contacts.OrderBy(c => c.Name).Take(take).ToListAsync(ct)).Select(c => new PersonDto(c.Name, c.Email, null, c.Department, null, "contact")));
+        var company = (await directory.Search(s, take, ct)).Select(p => new PersonDto(p.Name, p.Email, p.Username, p.Department, p.Position, "company"));
+        // One row per email: the company record wins for name/department, local rows fill gaps.
+        return company.Concat(local)
+            .Where(p => Emails.IsValid(p.Email))
+            .GroupBy(p => p.Email.Trim().ToLowerInvariant())
+            .Select(g => g.First())
+            .OrderBy(p => p.Name, StringComparer.CurrentCultureIgnoreCase)
+            .Take(take).ToList();
+    }
 
     [HttpGet]
     public async Task<List<ContactDto>> List()

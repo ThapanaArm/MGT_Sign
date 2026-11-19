@@ -95,6 +95,8 @@ public record TemplateField(int RecipientIndex, FieldType Type, int Page, double
 public record TemplateDetail(TemplateDto Template, TemplateDefinition Definition);
 public record SaveTemplateRequest(Guid EnvelopeId, string Name);
 public record ContactDto(Guid Id, string Name, string Email, string? Department);
+/// <summary>A person to send to. Source: user (MGT Sign account) | contact (saved) | company (MGT_Datawarehouse employee).</summary>
+public record PersonDto(string Name, string Email, string? Username, string? Department, string? Position, string Source);
 public record ContactInput(string Name, string Email, string? Department);
 public record AdminUserDto(Guid Id, string Email, string Name, string? Title, string? Company, UserRole Role, bool IsActive, DateTime CreatedAt,
     UserSource Source, string? Username, string? Department, DateTime? LastLoginAt);

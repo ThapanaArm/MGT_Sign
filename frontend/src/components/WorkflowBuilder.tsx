@@ -2,6 +2,7 @@ import type { ConditionOp, ContactDto, EscalationMode, QuorumMode, StepRule } fr
 import { Icon } from '../lib/icons';
 import { OP_LABEL, RULE_LABEL, wfMember, wfPreset, wfStep, type WfTypeInfo, type WfMember, type WfState, type WfStep } from '../lib/workflow';
 import { BuilderFlow } from './WorkflowFlow';
+import { PersonInput } from './PeoplePicker';
 
 /** Approval workflow builder (prototype wfBuilderHtml + wireWfBuilder). `W` is immutable state; `set` replaces it. */
 export function WorkflowBuilder({ W, set, types, contacts }: { W: WfState; set: (w: WfState) => void; types: WfTypeInfo[]; contacts: ContactDto[] }) {
@@ -74,11 +75,11 @@ export function WorkflowBuilder({ W, set, types, contacts }: { W: WfState; set: 
               <div className="wfm-list">
                 {st.members.map((m, j) => (
                   <div className="wfm" key={m.key}>
-                    <input className="inp" value={m.name} placeholder={(m.hint || 'Approver') + ' name'} onChange={e => setMember(i, j, { name: e.target.value })} />
-                    <input className="inp" data-mk="email" value={m.email} placeholder="Email" list="dir" onChange={e => {
-                      const email = e.target.value; const p = contacts.find(d => d.email === email);
-                      setMember(i, j, p && !m.name ? { email, name: p.name } : { email });
-                    }} />
+                    <PersonInput value={m.name} placeholder={(m.hint || 'Approver') + ' name'} ariaLabel="Approver name"
+                      onChange={v => setMember(i, j, { name: v })} onPick={p => setMember(i, j, { name: p.name, email: p.email })} />
+                    <PersonInput type="email" value={m.email} placeholder="Email" ariaLabel="Approver email"
+                      onChange={v => { const p = contacts.find(d => d.email === v); setMember(i, j, p && !m.name ? { email: v, name: p.name } : { email: v }); }}
+                      onPick={p => setMember(i, j, { name: p.name, email: p.email })} />
                     <label className="chk veto" title="A veto stops the whole workflow, whatever the rule"><input type="checkbox" checked={m.veto} onChange={e => setMember(i, j, { veto: e.target.checked })} /> Veto</label>
                     <button className="icon-btn" title="Remove approver" disabled={n < 2} onClick={() => {
                       const members = st.members.filter((_, k) => k !== j);
@@ -96,11 +97,12 @@ export function WorkflowBuilder({ W, set, types, contacts }: { W: WfState; set: 
                 <select className="inp" style={{ width: 230 }} value={st.escalation.mode} onChange={e => setStep(i, { escalation: { ...st.escalation!, mode: e.target.value as EscalationMode } })}>
                   <option value="addBackup">Add a backup authority</option><option value="notify">Remind approvers and notify backup</option>
                 </select>
-                <input className="inp" value={st.escalation.name} placeholder="Backup name" style={{ width: 170 }} onChange={e => setStep(i, { escalation: { ...st.escalation!, name: e.target.value } })} />
-                <input className="inp" value={st.escalation.email} placeholder="Backup email" list="dir" style={{ width: 210 }} onChange={e => {
-                  const email = e.target.value; const p = contacts.find(d => d.email === email); const esc = st.escalation!;
-                  setStep(i, { escalation: { ...esc, email, name: p && !esc.name ? p.name : esc.name } });
-                }} />
+                <PersonInput value={st.escalation.name} placeholder="Backup name" ariaLabel="Backup authority name" style={{ width: 190 }}
+                  onChange={v => setStep(i, { escalation: { ...st.escalation!, name: v } })}
+                  onPick={p => setStep(i, { escalation: { ...st.escalation!, name: p.name, email: p.email } })} />
+                <PersonInput type="email" value={st.escalation.email} placeholder="Backup email" ariaLabel="Backup authority email" style={{ width: 230 }}
+                  onChange={v => { const p = contacts.find(d => d.email === v); const esc = st.escalation!; setStep(i, { escalation: { ...esc, email: v, name: p && !esc.name ? p.name : esc.name } }); }}
+                  onPick={p => setStep(i, { escalation: { ...st.escalation!, name: p.name, email: p.email } })} />
                 <span className="hint" style={{ flexBasis: '100%', margin: 0 }}>Escalation never approves automatically.</span>
               </div>}
             </div>
