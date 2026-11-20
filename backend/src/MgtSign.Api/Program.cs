@@ -86,6 +86,17 @@ var app = builder.Build();
 using (var scope = app.Services.CreateScope())
     await Seeder.Run(scope.ServiceProvider, app.Configuration, app.Logger);
 
+{
+    // Say at startup whether company sign-in is on, so a missing secret is obvious (the connection string itself is never logged).
+    var dw = app.Services.GetRequiredService<IOptions<DatawarehouseOptions>>().Value;
+    if (dw.Enabled && !string.IsNullOrWhiteSpace(dw.ConnectionString))
+        app.Logger.LogInformation("Company sign-in (MGT_Datawarehouse) is on.");
+    else
+        app.Logger.LogWarning("Company sign-in (MGT_Datawarehouse) is OFF: Datawarehouse:Enabled={Enabled}, ConnectionStrings:Datawarehouse {Conn}. Environment={Env}, user-secrets id {Secrets}.",
+            dw.Enabled, string.IsNullOrWhiteSpace(dw.ConnectionString) ? "is missing" : "is set", app.Environment.EnvironmentName,
+            typeof(Program).Assembly.GetCustomAttributes(typeof(Microsoft.Extensions.Configuration.UserSecrets.UserSecretsIdAttribute), false).Length > 0 ? "present" : "missing");
+}
+
 app.UseForwardedHeaders(new ForwardedHeadersOptions { ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto });
 app.UseMiddleware<ErrorMiddleware>();
 if (app.Environment.IsDevelopment()) app.MapOpenApi();
